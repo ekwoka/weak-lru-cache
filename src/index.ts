@@ -1,6 +1,8 @@
-export const WeakLRUCache = <T extends object>() => {
+export const WeakLRUCache = <T extends object>(
+  options: LRUCacheOptions = {}
+) => {
   const cache = new Map<string, Entry<T>>();
-  const expirer = Expirer<T>(cache);
+  const expirer = Expirer<T>(cache, options);
   return {
     set: (key: string, value: T) => {
       const entry = cache.get(key) ?? { key, value, next: null, prev: null };
@@ -36,7 +38,10 @@ export const WeakLRUCache = <T extends object>() => {
 
 export default WeakLRUCache;
 
-const Expirer = <T extends object>(cache: Map<string, Entry<T>>) => {
+const Expirer = <T extends object>(
+  cache: Map<string, Entry<T>>,
+  options: LRUCacheOptions
+) => {
   let length = 0;
   let head: Entry<T> | null = null;
   let tail: Entry<T> | null = null;
@@ -55,7 +60,7 @@ const Expirer = <T extends object>(cache: Map<string, Entry<T>>) => {
     (key: string) => cache.has(key) && cache.delete(remove(cache.get(key)).key)
   );
   const prune = () => {
-    if (length <= 1000) return;
+    if (length <= (options.size ?? 1000)) return;
     registry.register(tail.value, tail.key);
     if (!(tail.value instanceof WeakRef)) tail.value = new WeakRef(tail.value);
     remove(tail);
@@ -84,3 +89,7 @@ type Entry<T extends object> = {
   prev: Entry<T> | null;
   key: string;
 };
+
+type LRUCacheOptions = Partial<{
+  size: number;
+}>;

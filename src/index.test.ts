@@ -81,4 +81,9 @@ describe('Weak LRU Cache', () => {
     expect(cache.get('obj')).toBe(obj);
     expect(cache.peekReference('obj') instanceof WeakRef).toBe(false);
   });
+  it('accepts size option', () => {
+    const cache = WeakLRUCache<{ foo: string }>({ size: 2 });
+    for (let i = 0; i < 3; i++) cache.set(`obj${i}`, { foo: 'bar' });
+    expect(cache.peekReference('obj0') instanceof WeakRef).toBe(true);
+  });
 });
