@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+pnpm exec lint-staged
+bun run build || pnpm run build
+pnpm run test --run
+bun run size || pnpm run size
+git add size.json

@@ -1,10 +1,15 @@
 {
+  "include": ["src/**/*"],
   "compilerOptions": {
     "types": ["vitest/globals"],
+    "noEmit": true,
     "target": "ESNext",
     "lib": ["dom", "dom.iterable", "esnext"],
     "module": "esnext",
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "declaration": true,
+    "outDir": "dist",
+    "declarationMap": true
   }
 }

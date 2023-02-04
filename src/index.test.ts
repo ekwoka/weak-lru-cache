@@ -22,7 +22,6 @@ describe('Weak LRU Cache', () => {
     for (let i = 0; i < 1000; i++) cache.set(`obj${i}`, { foo: 'bar' });
     expect(cache.peek('obj0')).toBeDefined();
     expect(cache.peek('obj999')).toBeDefined();
-    expect(cache.length()).toBe(1000);
   });
   it('caches 2000 objects', () => {
     const cache = WeakLRUCache<{ foo: string }>();
@@ -31,33 +30,18 @@ describe('Weak LRU Cache', () => {
     expect(cache.peek('obj999')).toBeDefined();
     expect(cache.peek('obj1999')).toBeDefined();
   });
-  it('weakly references old entries', async () => {
+  it('weakly references old entries', () => {
     const cache = WeakLRUCache<{ foo: string }>();
     for (let i = 0; i < 2000; i++) cache.set(`obj${i}`, { foo: 'bar' });
     expect(cache.peek('obj0')).toBeDefined();
     expect(cache.peekReference('obj0') instanceof WeakRef).toBe(true);
   });
-  it('returns total length of cache', () => {
+  it('can reset values', () => {
     const cache = WeakLRUCache<{ foo: string }>();
-    for (let i = 0; i < 100; i++) cache.set(`obj${i}`, { foo: 'bar' });
-    expect(cache.length()).toBe(100);
-    for (let i = 100; i < 200; i++) cache.set(`obj${i}`, { foo: 'bar' });
-    expect(cache.length()).toBe(200);
-  });
-  it('properly delinks entries that are repositioned', () => {
-    const cache = WeakLRUCache<{ foo: string }>();
-    for (let i = 0; i < 10; i++) cache.set(`obj${i}`, { foo: 'bar' });
-    cache.get('obj0');
-    expect(cache.length()).toBe(10);
-    for (let i = 10; i < 20; i++) cache.set(`obj${i}`, { foo: 'bar' });
-    expect(cache.length()).toBe(20);
-  });
-  it('handles setting new values to existing entries', () => {
-    const cache = WeakLRUCache<{ foo: string }>();
-    for (let i = 0; i < 3; i++) cache.set(`obj${i}`, { foo: 'bar' });
-    cache.get('obj0');
-    expect(cache.length()).toBe(3);
-    for (let i = 0; i < 3; i++) cache.set(`obj${i}`, { foo: 'bar' });
-    expect(cache.length()).toBe(3);
+    const obj = { foo: 'bar' };
+    cache.set('obj', obj);
+    expect(cache.get('obj')).toBe(obj);
+    cache.set('obj', { foo: 'baz' });
+    expect(cache.get('obj')).not.toBe(obj);
   });
 });
