@@ -18,7 +18,7 @@ export default defineConfig({
     globals: true,
     includeSource: ['*.{spec,test}.{ts,tsx}'],
     coverage: {
-      reporter: ['text-summary', 'text'],
+      reporter: ['text-summary', 'text', 'html'],
     },
     deps: {},
   },

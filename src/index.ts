@@ -44,8 +44,8 @@ const Expirer = <T extends object>(cache: Map<string, Entry<T>>) => {
     if (!entry.prev && !entry.next) return entry;
     if (entry.prev) entry.prev.next = entry.next;
     if (entry.next) entry.next.prev = entry.prev;
-    if (tail === entry) tail = entry.next ?? entry.prev ?? null;
-    if (head === entry) head = entry.next ?? null;
+    if (tail === entry) tail = entry.next ?? entry.prev;
+    if (head === entry) head = entry.next;
     entry.prev = null;
     entry.next = null;
     length--;
@@ -75,7 +75,6 @@ const Expirer = <T extends object>(cache: Map<string, Entry<T>>) => {
       return entry;
     },
     remove,
-    head: () => head,
   };
 };
 
