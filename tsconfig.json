@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "types": ["vitest/globals"],
+    "target": "ESNext",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node"
+  }
+}
