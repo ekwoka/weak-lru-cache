@@ -2,101 +2,93 @@ import { debounce } from './utils/debounce';
 
 export const WeakLRUCache = <T extends object>() => {
   const cache = new Map<string, Entry<T>>();
+  const expirer = Expirer<T>(cache);
+  return {
+    set: (key: string, value: T) => {
+      const entry = cache.get(key) ?? { key, value, next: null, prev: null };
+      cache.set(key, entry);
+      return expirer.add(expirer.remove(entry));
+    },
+    get: (key: string) => {
+      const entry = cache.get(key);
+      if (!entry) return undefined;
+      if (entry.value instanceof WeakRef) entry.value = entry.value.deref();
+      if (!entry.value) return cache.delete(expirer.remove(entry).key), undefined;
+      return expirer.add(expirer.remove(entry)).value;
+    },
+    has: (key: string) => cache.has(key),
+    delete: (key: string) => (cache.has(key) ? cache.delete(expirer.remove(cache.get(key)).key) : false),
+    peek: (key: string) => {
+      const entry = cache.get(key);
+      if (!entry) return undefined;
+      if (!entry.value || (entry.value instanceof WeakRef && !entry.value.deref())) return cache.delete(expirer.remove(entry).key), undefined;
+      if (entry.value instanceof WeakRef) return entry.value.deref();
+      return entry.value;
+    },
+    peekReference: (key: string) => cache.get(key)?.value,
+    length: () => {
+      const keys = new Set<string>();
+      let length = 0;
+      let current = expirer.head();
+      while (current) {
+        length++;
+        keys.add(current.key);
+        if (keys.has(current.next?.key)) throw new Error(`Loop Detected: ${[...keys].join('-')}`);
+        current = current.next;
+      }
+      return length;
+    }
+  };
+};
+
+const Expirer = <T extends object>(cache: Map<string, Entry<T>>) => {
   let length = 0;
   let head: Entry<T> | null = null;
   let tail: Entry<T> | null = null;
   let releasedObjects = 0;
   let lastRelease: number;
+  const remove = (entry: Entry<T>) => {
+    if (!entry.prev && !entry.next) return entry;
+    if (entry.prev) entry.prev.next = entry.next;
+    if (entry.next) entry.next.prev = entry.prev;
+    if (tail === entry) tail = entry.next ?? entry.prev ?? null;
+    if (head === entry) head = entry.next ?? null;
+    entry.prev = null;
+    entry.next = null;
+    length--;
+    return entry;
+  };
   const logRelease = debounce((key: string) => {
-    console.log([`Released ${releasedObjects} objects from cache`, `Most recently released: ${key}`, lastRelease ? `Time Between Releases: ${((Date.now() - lastRelease) / 1000).toFixed(2)}s` : 'This was the first release'].join('\n'));
-    if (!lastRelease) lastRelease = Date.now();
-    releasedObjects = 0;
+    console.log([`Released ${releasedObjects} total objects`, `Most recently released: ${key}`, lastRelease ? `Time Between Releases: ${((Date.now() - lastRelease) / 1000).toFixed(2)}s` : 'This was the first release'].join('\n'));
+    lastRelease = Date.now();
   });
   const registry = new FinalizationRegistry((key: string) => {
     releasedObjects++;
     logRelease(key);
-    const entry = cache.get(key);
-    if (entry) {
-      if (entry.prev) entry.prev.next = entry.next;
-      if (entry.next) entry.next.prev = entry.prev;
-      if (tail === entry) tail = (entry.next ? entry.next : entry.prev) ?? entry;
-      cache.delete(key);
-      length--;
-    }
+    if (cache.has(key)) cache.delete(remove(cache.get(key)).key);
   });
+  const prune = () => {
+    if (length <= 1000) return;
+    registry.register(tail.value, tail.key);
+    if (!(tail.value instanceof WeakRef)) tail.value = new WeakRef(tail.value);
+    remove(tail);
+  };
   return {
-    set: (key: string, value: T) => {
-      const oldEntry = cache.get(key);
-      if (oldEntry) {
-        if (!(oldEntry.value instanceof WeakRef)) length--;
-        oldEntry.value = value;
-        if (oldEntry.prev) oldEntry.prev.next = oldEntry.next;
-        if (oldEntry.next) oldEntry.next.prev = oldEntry.prev;
-        if (tail === oldEntry) tail = (oldEntry.next ? oldEntry.next : oldEntry.prev) ?? oldEntry;
-        if (!head) head = oldEntry;
-        else {
-          oldEntry.next = head;
-          head.prev = oldEntry;
-          head = oldEntry;
-          oldEntry.prev = null;
-          length++;
-        }
-      } else {
-        const entry: Entry<T> = { key, value, next: head, prev: null };
-        if (head) head.prev = entry;
-        head = entry;
-        if (!tail) tail = entry;
-        cache.set(key, entry);
-        length++;
+    add: (entry: Entry<T>) => {
+      registry.register(entry.value, `entry: ${entry.key}`);
+      if (entry.value instanceof WeakRef) entry.value = entry.value.deref();
+      if (head) {
+        entry.next = head;
+        head.prev = entry;
       }
-      if (length > 1000) {
-        if (!(tail.value instanceof WeakRef)) {
-          registry.register(tail.value, tail.key, tail.value);
-          tail.value = new WeakRef(tail.value);
-        }
-        tail = tail.prev;
-        length--;
-      }
+      head = entry;
+      if (!tail) tail = entry;
+      length++;
+      prune();
+      return entry;
     },
-    get: (key: string) => {
-      const entry = cache.get(key);
-      if (entry) {
-        if (entry.value instanceof WeakRef) entry.value = entry.value.deref();
-        registry.unregister(entry.value);
-        if (entry.prev) entry.prev.next = entry.next;
-        if (entry.next) entry.next.prev = entry.prev;
-        if (tail === entry) tail = (entry.next ? entry.next : entry.prev) ?? entry;
-        if (!entry.value) return undefined;
-        if (!head) head = entry;
-        else {
-          entry.next = head;
-          head.prev = entry;
-          head = entry;
-          entry.prev = null;
-        }
-        return entry.value;
-      }
-      return undefined;
-    },
-    peek: (key: string) => {
-      const entry = cache.get(key);
-      if (entry) {
-        if (entry.value instanceof WeakRef) return entry.value.deref();
-        return entry.value;
-      }
-      return undefined;
-    },
-    peekReference: (key: string) => {
-      const entry = cache.get(key);
-      if (entry) return entry.value;
-      return undefined;
-    },
-    length: () => {
-      let length = 0;
-      let current = head;
-      while (current) if (current) length++, (current = current.next);
-      return length;
-    }
+    remove,
+    head: () => head
   };
 };
 
