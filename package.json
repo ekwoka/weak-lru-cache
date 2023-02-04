@@ -1,6 +1,6 @@
 {
   "name": "@ekwoka/weak-lru-cache",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "A simple weak referenced Least Recently Used cache",
   "author": {
     "name": "Eric Kwoka",
@@ -17,7 +17,6 @@
     "least recently used"
   ],
   "type": "module",
-  "private": true,
   "sideEffects": false,
   "main": "dist/index.js",
   "module": "dist/index.mjs",
