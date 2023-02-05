@@ -1,27 +1,29 @@
+export type WeakLRUCache<T extends object> = ReturnType<typeof WeakLRUCache<T>>;
+
 export const WeakLRUCache = <T extends object>(
   options: LRUCacheOptions = {}
 ) => {
   const cache = new Map<string, Entry<T>>();
   const expirer = Expirer<T>(cache, options);
   return {
-    set: (key: string, value: T) => {
+    set: (key: string, value: T): T => {
       const entry = cache.get(key) ?? { key, value, next: null, prev: null };
       entry.value = value;
       cache.set(key, entry);
-      return expirer.add(expirer.remove(entry));
+      return expirer.add(expirer.remove(entry)).value as T;
     },
-    get: (key: string) => {
+    get: (key: string): T => {
       const entry = cache.get(key);
       if (!entry) return undefined;
       if (entry.value instanceof WeakRef) entry.value = entry.value.deref();
       if (!entry.value)
         return cache.delete(expirer.remove(entry).key), undefined;
-      return expirer.add(expirer.remove(entry)).value;
+      return expirer.add(expirer.remove(entry)).value as T;
     },
-    has: (key: string) => cache.has(key),
-    delete: (key: string) =>
+    has: (key: string): boolean => cache.has(key),
+    delete: (key: string): boolean =>
       cache.has(key) ? cache.delete(expirer.remove(cache.get(key)).key) : false,
-    peek: (key: string) => {
+    peek: (key: string): T => {
       const entry = cache.get(key);
       if (!entry) return undefined;
       if (
@@ -32,7 +34,7 @@ export const WeakLRUCache = <T extends object>(
       if (entry.value instanceof WeakRef) return entry.value.deref();
       return entry.value;
     },
-    peekReference: (key: string) => cache.get(key)?.value,
+    peekReference: (key: string): T | WeakRef<T> => cache.get(key)?.value,
   };
 };
 
