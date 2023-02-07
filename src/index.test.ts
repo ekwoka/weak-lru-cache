@@ -1,5 +1,75 @@
 import { WeakLRUCache } from '.';
 
+describe('Map API', () => {
+  it('can set', () => {
+    const cache = WeakLRUCache<{ foo: string }>();
+    expect(cache.set('foo', { foo: 'bar' })).toBe(cache);
+    expect(cache.has('foo')).toBe(true);
+  });
+  it('can get', () => {
+    const cache = WeakLRUCache<{ foo: string }>();
+    expect(cache.get('foo')).toBeUndefined();
+    cache.set('foo', { foo: 'bar' });
+    expect(cache.get('foo')).toEqual({ foo: 'bar' });
+  });
+  it('can check if has', () => {
+    const cache = WeakLRUCache<{ foo: string }>();
+    expect(cache.has('foo')).toBe(false);
+    cache.set('foo', { foo: 'bar' });
+    expect(cache.has('foo')).toBe(true);
+  });
+  it('can delete', () => {
+    const cache = WeakLRUCache<{ foo: string }>();
+    cache.set('foo', { foo: 'bar' });
+    expect(cache.has('foo')).toBe(true);
+    expect(cache.delete('foo')).toBe(true);
+    expect(cache.has('foo')).toBe(false);
+    expect(cache.delete('foo')).toBe(false);
+  });
+  it('can clear', () => {
+    const cache = WeakLRUCache<{ foo: string }>();
+    cache.set('foo', { foo: 'bar' });
+    expect(cache.has('foo')).toBe(true);
+    cache.clear();
+    expect(cache.has('foo')).toBe(false);
+  });
+  it('can return keys', () => {
+    const cache = WeakLRUCache<{ foo: string }>();
+    cache.set('foo', { foo: 'bar' });
+    expect([...cache.keys()]).toEqual(['foo']);
+  });
+  it('can return values', () => {
+    const cache = WeakLRUCache<{ foo: string }>();
+    cache.set('foo', { foo: 'bar' });
+    expect([...cache.values()]).toEqual([{ foo: 'bar' }]);
+  });
+  it('can return entries', () => {
+    const cache = WeakLRUCache<{ foo: string }>();
+    cache.set('foo', { foo: 'bar' });
+    expect([...cache.entries()]).toEqual([['foo', { foo: 'bar' }]]);
+  });
+  it('can iterate', () => {
+    const cache = WeakLRUCache<{ foo: string }>();
+    cache.set('foo', { foo: 'bar' });
+    const entries: [string, { foo: string }][] = [];
+    for (const entry of cache) entries.push(entry);
+    expect(entries).toEqual([['foo', { foo: 'bar' }]]);
+  });
+  it('can return size', () => {
+    const cache = WeakLRUCache<{ foo: string }>();
+    expect(cache.size).toBe(0);
+    cache.set('foo', { foo: 'bar' });
+    expect(cache.size).toBe(1);
+  });
+  it('can loop over forEach', () => {
+    const cache = WeakLRUCache<{ foo: string }>();
+    cache.set('foo', { foo: 'bar' });
+    const entries: [string, { foo: string }][] = [];
+    cache.forEach((value, key) => entries.push([key, value]));
+    expect(entries).toEqual([['foo', { foo: 'bar' }]]);
+  });
+});
+
 describe('Weak LRU Cache', () => {
   it('caches object', () => {
     const cache = WeakLRUCache<{ foo: string }>();
