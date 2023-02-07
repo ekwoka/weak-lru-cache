@@ -55,7 +55,7 @@ export const WeakLRUCache = <T extends object>(
     has: (key: string): boolean => cache.has(key),
     delete: (key: string): boolean =>
       cache.has(key) ? cache.delete(expirer.remove(cache.get(key)).key) : false,
-    clear: (): void => cache.clear(),
+    clear: (): void => (cache.forEach(expirer.remove), cache.clear()),
     keys: (): IterableIterator<string> => iterateCache(cache, expirer, 0),
     values: (): IterableIterator<T> => iterateCache(cache, expirer, 1),
     entries: (): IterableIterator<[string, T]> =>

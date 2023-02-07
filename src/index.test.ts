@@ -48,7 +48,7 @@ describe('Map API', () => {
     cache.set('foo', { foo: 'bar' });
     expect([...cache.entries()]).toEqual([['foo', { foo: 'bar' }]]);
   });
-  it('can iterate', () => {
+  it('can directly iterate', () => {
     const cache = WeakLRUCache<{ foo: string }>();
     cache.set('foo', { foo: 'bar' });
     const entries: [string, { foo: string }][] = [];
