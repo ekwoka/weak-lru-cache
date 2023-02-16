@@ -65,15 +65,14 @@ export const WeakLRUCache = <T extends object>(
     clear: (): void => (cache.forEach(expirer.remove), cache.clear()),
     keys: (): IterableIterator<string> => iterateCache(cache, expirer, 0),
     values: (): IterableIterator<T> => iterateCache(cache, expirer, 1),
-    entries: (): IterableIterator<[string, T]> =>
-      iterateCache(cache, expirer, 2),
+    entries: (): IterableIterator<[string, T]> => iterateCache(cache, expirer),
     [Symbol.iterator]: (): IterableIterator<[string, T]> =>
-      iterateCache(cache, expirer, 2),
+      iterateCache(cache, expirer),
     get size() {
       return cache.size;
     },
     forEach: (cb) => {
-      for (const [key, value] of iterateCache(cache, expirer, 2))
+      for (const [key, value] of iterateCache(cache, expirer))
         cb(value, key, weakLRUCache);
     },
   };
@@ -93,7 +92,7 @@ function iterateCache<T extends object>(
 function iterateCache<T extends object>(
   cache: Map<string, Entry<T>>,
   expirer: Expirer<T>,
-  mode: 2
+  mode?: 2
 ): IterableIterator<[string, T]>;
 function* iterateCache<T extends object>(
   cache: Map<string, Entry<T>>,

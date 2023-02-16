@@ -4,7 +4,7 @@ export const Expirer = <T extends object>(
   cache: Map<string, Entry<T>>,
   options: LRUCacheOptions<T>
 ) => {
-  let length = 0;
+  let size = 0;
   let head: Entry<T> | null = null;
   let tail: Entry<T> | null = null;
   const remove = (entry: Entry<T>) => {
@@ -16,7 +16,7 @@ export const Expirer = <T extends object>(
     if (head === entry) head = entry.next;
     entry.prev = null;
     entry.next = null;
-    length--;
+    size -= entry.size;
     return entry;
   };
   const registry = new FinalizationRegistry(
@@ -29,7 +29,7 @@ export const Expirer = <T extends object>(
     remove(entry);
   };
   const prune = () => {
-    if (length <= (options.size ?? 1000)) return;
+    if (size <= (options.size ?? 1000)) return;
     expireEntry(tail);
   };
   return {
@@ -42,7 +42,8 @@ export const Expirer = <T extends object>(
       }
       head = entry;
       if (!tail) tail = entry;
-      length++;
+      size += entry.size;
+      if (entry.timeout) clearTimeout(entry.timeout);
       if (options.maxAge)
         entry.timeout = setTimeout(expireEntry, options.maxAge, entry);
       prune();
