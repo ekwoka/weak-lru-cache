@@ -3,8 +3,12 @@ export type Entry<T extends object> = {
   next: Entry<T> | null;
   prev: Entry<T> | null;
   key: string;
+  timeout?: number | NodeJS.Timeout | null;
+  size: number;
 };
 
-export type LRUCacheOptions = Partial<{
+export type LRUCacheOptions<T> = Partial<{
   size: number;
+  maxAge: number;
+  getSize: (value: T) => number;
 }>;

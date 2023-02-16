@@ -20,14 +20,21 @@ export type WeakLRUCache<T extends object> = {
 };
 
 export const WeakLRUCache = <T extends object>(
-  options: LRUCacheOptions = {}
+  options: LRUCacheOptions<T> = {}
 ): WeakLRUCache<T> => {
   const cache = new Map<string, Entry<T>>();
   const expirer = Expirer<T>(cache, options);
   const weakLRUCache: WeakLRUCache<T> = {
     set: (key: string, value: T): WeakLRUCache<T> => {
-      const entry = cache.get(key) ?? { key, value, next: null, prev: null };
+      const entry = cache.get(key) ?? {
+        key,
+        value,
+        next: null,
+        prev: null,
+        size: 1,
+      };
       entry.value = value;
+      entry.size = options.getSize?.(value) ?? 1;
       cache.set(key, entry);
       expirer.add(expirer.remove(entry)).value as T;
       return weakLRUCache;
