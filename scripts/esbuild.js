@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { writeFile } from 'node:fs/promises';
+import { writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { gzipSize } from 'gzip-size';
 import prettyBytes from 'pretty-bytes';
@@ -26,9 +26,18 @@ const content = JSON.stringify(
   null,
   2
 );
+const old = JSON.parse(await readFile(join('size.json'), 'utf8'));
 await writeFile(join('size.json'), content, 'utf8');
-console.log(`New Package size: ${minified.pretty}`);
-console.log(`Minzipped size: ${gzipped.pretty}`);
+console.log(
+  `Package size: ${old.minified.pretty} => ${minified.pretty}: ${prettyBytes(
+    minified.raw - old.minified.raw
+  )}`
+);
+console.log(
+  `Minzipped size: ${old.gzipped.pretty} => ${gzipped.pretty}: ${prettyBytes(
+    gzipped.raw - old.gzipped.raw
+  )}`
+);
 
 function sizeInfo(bytesSize) {
   return {

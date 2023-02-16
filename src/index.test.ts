@@ -160,7 +160,7 @@ describe('Weak LRU Cache', () => {
     expect(cache.peekReference('obj0') instanceof WeakRef).toBe(true);
   });
   it('accepts size processor', () => {
-    const sizeCallback = vi.fn().mockImplementation(() => 1);
+    const sizeCallback = vi.fn().mockImplementation(() => 4);
     const cache = WeakLRUCache<{ foo: string }>({
       size: 2,
       getSize: sizeCallback,
@@ -171,6 +171,7 @@ describe('Weak LRU Cache', () => {
     expect(sizeCallback).toBeCalledTimes(2);
     cache.get('obj');
     expect(sizeCallback).toBeCalledTimes(2);
+    expect(cache.peekReference('obj') instanceof WeakRef).toBe(true);
   });
   it('accepts maxAge option', async () => {
     const cache = WeakLRUCache<{ foo: string }>({ maxAge: 1 });
