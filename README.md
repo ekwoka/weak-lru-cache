@@ -45,7 +45,9 @@ This function creates the cache object. It accepts the optional argument of cach
 
 #### `WeakLRUCacheOptions`
 
-- `size?: number` - The maximum number of items that can be stored in the cache. If this is not provided, the cache will be defaulted to 1000 items. As mentioned, this is a soft limit, and more items may be kept in the cache so long as they are still being used.
+- `size?: number` - The maximum size of the Cache. Defaults to `1000`
+- `maxAge?: number` - The maximum age (in seconds) of an item before it is evicted and replaced with a `WeakRef`.
+- `getSize?: (T) => number` - A function for evaluating the size of an item. By default every item is `1` (making the size a length of sorts). With this you can use methods to evaluate the actual memory size of the object to make the cache memory limited. Function will be run on every item when added to the cache, and will be passed the item in question.
 
 ### Properties
 
