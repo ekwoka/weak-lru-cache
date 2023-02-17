@@ -2,8 +2,8 @@
 
 [<img src="https://img.shields.io/npm/v/@ekwoka/weak-lru-cache?label=%20&style=for-the-badge&logo=pnpm&logoColor=white">](https://www.npmjs.com/package/@ekwoka/weak-lru-cache)
 <img src="https://img.shields.io/npm/types/@ekwoka/weak-lru-cache?label=%20&logo=typescript&logoColor=white&style=for-the-badge">
-<img src="https://img.shields.io/npm/dt/@ekwoka/weak-lru-cache?style=for-the-badge&logo=npm&logoColor=white" >
-[<img src="https://img.shields.io/bundlephobia/minzip/@ekwoka/weak-lru-cache?style=for-the-badge&logo=esbuild&logoColor=white">](https://bundlephobia.com/package/@ekwoka/weak-lru-cache)
+<img src="https://img.shields.io/npm/dt/@ekwoka/weak-lru-cache?style=for-the-badge&logo=npm&logoColor=white&logo=npm&logoColor=white" >
+[<img src="https://img.shields.io/bundlephobia/minzip/@ekwoka/weak-lru-cache?style=for-the-badge&logo=esbuild&logoColor=white&logo=esbuild&logoColor=white">](https://bundlephobia.com/package/@ekwoka/weak-lru-cache)
 <img src="https://img.shields.io/badge/coverage-98%25-success?style=for-the-badge&logo=vitest&logoColor=white" alt="98% test coverage">
 
 This cache allows for items to be stored and maintained while in use, but also allowing for unused items to be garbage collected after they have been sufficiently pushed out by more recently used items.
@@ -45,7 +45,9 @@ This function creates the cache object. It accepts the optional argument of cach
 
 #### `WeakLRUCacheOptions`
 
-- `size?: number` - The maximum number of items that can be stored in the cache. If this is not provided, the cache will be defaulted to 1000 items. As mentioned, this is a soft limit, and more items may be kept in the cache so long as they are still being used.
+- `size?: number` - The maximum size of the Cache. Defaults to `1000`
+- `maxAge?: number` - The maximum age (in seconds) of an item before it is evicted and replaced with a `WeakRef`.
+- `getSize?: (T) => number` - A function for evaluating the size of an item. By default every item is `1` (making the size a length of sorts). With this you can use methods to evaluate the actual memory size of the object to make the cache memory limited. Function will be run on every item when added to the cache, and will be passed the item in question.
 
 ### Properties
 

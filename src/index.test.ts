@@ -71,6 +71,9 @@ describe('Map API', () => {
 });
 
 describe('Weak LRU Cache', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
   it('caches object', () => {
     const cache = WeakLRUCache<{ foo: string }>();
     const obj = { foo: 'bar' };
@@ -155,5 +158,26 @@ describe('Weak LRU Cache', () => {
     const cache = WeakLRUCache<{ foo: string }>({ size: 2 });
     for (let i = 0; i < 3; i++) cache.set(`obj${i}`, { foo: 'bar' });
     expect(cache.peekReference('obj0') instanceof WeakRef).toBe(true);
+  });
+  it('accepts size processor', () => {
+    const sizeCallback = vi.fn().mockImplementation(() => 4);
+    const cache = WeakLRUCache<{ foo: string }>({
+      size: 2,
+      getSize: sizeCallback,
+    });
+    cache.set('obj', { foo: 'bar' });
+    expect(sizeCallback).toBeCalledTimes(1);
+    cache.set('obj', { foo: 'bazz' });
+    expect(sizeCallback).toBeCalledTimes(2);
+    cache.get('obj');
+    expect(sizeCallback).toBeCalledTimes(2);
+    expect(cache.peekReference('obj') instanceof WeakRef).toBe(true);
+  });
+  it('accepts maxAge option', async () => {
+    const cache = WeakLRUCache<{ foo: string }>({ maxAge: 1 });
+    cache.set('obj', { foo: 'bar' });
+    expect(cache.peekReference('obj') instanceof WeakRef).toBeFalsy();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(cache.peekReference('obj') instanceof WeakRef).toBeTruthy();
   });
 });
