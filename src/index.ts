@@ -1,21 +1,15 @@
-import { Expirer } from './expirer';
-import { Entry, LRUCacheOptions } from './types';
+import { Expirer, Entry } from './expirer';
+import type { LRUCacheOptions } from './types';
 
 export class WeakLRUCache<T extends object> implements Map<string, T> {
   [Symbol.toStringTag]: 'WeakLRUCache';
   public cache: Map<string, Entry<T>> = new Map();
   public expirer: Expirer<T>;
   constructor(public options: LRUCacheOptions<T> = {}) {
-    this.expirer = Expirer(this.cache, this.options);
+    this.expirer = new Expirer(this.cache, this.options);
   }
   set(key: string, value: T): this {
-    const entry = this.cache.get(key) ?? {
-      key,
-      value,
-      next: null,
-      prev: null,
-      size: 1,
-    };
+    const entry = this.cache.get(key) ?? new Entry(value, key, 1);
     entry.value = value;
     entry.size = this.options.getSize?.(value) ?? 1;
     this.cache.set(key, entry);

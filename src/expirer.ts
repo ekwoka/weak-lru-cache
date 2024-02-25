@@ -1,54 +1,94 @@
-import { Entry, LRUCacheOptions } from './types';
-export type Expirer<T extends object> = ReturnType<typeof Expirer<T>>;
-export const Expirer = <T extends object>(
-  cache: Map<string, Entry<T>>,
-  options: LRUCacheOptions<T>
-) => {
-  let size = 0;
-  let head: Entry<T> | null = null;
-  let tail: Entry<T> | null = null;
-  const remove = (entry: Entry<T>) => {
-    if (entry.timeout) clearTimeout(entry.timeout);
-    if (!entry.prev && !entry.next) return entry;
-    if (entry.prev) entry.prev.next = entry.next;
-    if (entry.next) entry.next.prev = entry.prev;
-    if (tail === entry) tail = entry.next ?? entry.prev;
-    if (head === entry) head = entry.next;
-    entry.prev = null;
-    entry.next = null;
-    size -= entry.size;
-    return entry;
-  };
-  const registry = new FinalizationRegistry(
-    (key: string) => cache.has(key) && cache.delete(remove(cache.get(key)).key)
-  );
-  const expireEntry = (entry: Entry<T>) => {
-    registry.register(entry.value, entry.key);
+import type { LRUCacheOptions } from './types';
+
+export class Expirer<T extends object> {
+  size = 0;
+  head: Entry<T> | null = null;
+  tail: Entry<T> | null = null;
+  registry: FinalizationRegistry<string>;
+
+  constructor(
+    public cache: Map<string, Entry<T>>,
+    public options: LRUCacheOptions<T>,
+  ) {
+    this.registry = new FinalizationRegistry(
+      (key: string) =>
+        cache.has(key) && cache.delete(this.remove(cache.get(key)).key),
+    );
+  }
+  remove(entry: Entry<T>) {
+    entry.clearTimeout();
+    if (entry.disconnected) return entry;
+    if (this.tail === entry) this.tail = entry.next ?? entry.prev;
+    if (this.head === entry) this.head = entry.next;
+    this.size -= entry.size;
+    return entry.remove();
+  }
+
+  expireEntry(entry: Entry<T>) {
+    this.registry.register(entry.value, entry.key);
     if (!(entry.value instanceof WeakRef))
       entry.value = new WeakRef(entry.value);
-    remove(entry);
-  };
-  const prune = () => {
-    if (size <= (options.size ?? 1000)) return;
-    expireEntry(tail);
-  };
-  return {
-    add: (entry: Entry<T>) => {
-      registry.register(entry.value, `entry: ${entry.key}`);
-      if (entry.value instanceof WeakRef) entry.value = entry.value.deref();
-      if (head) {
-        entry.next = head;
-        head.prev = entry;
-      }
-      head = entry;
-      if (!tail) tail = entry;
-      size += entry.size;
-      if (entry.timeout) clearTimeout(entry.timeout);
-      if (options.maxAge)
-        entry.timeout = setTimeout(expireEntry, options.maxAge, entry);
-      prune();
-      return entry;
-    },
-    remove,
-  };
-};
+    this.remove(entry);
+    return this;
+  }
+  prune() {
+    if (this.size <= (this.options.size ?? 1000)) return;
+    this.expireEntry(this.tail);
+  }
+  add(entry: Entry<T>) {
+    this.registry.register(entry.value, `entry: ${entry.key}`);
+    if (entry.value instanceof WeakRef) entry.value = entry.value.deref();
+    if (this.head) {
+      entry.next = this.head;
+      this.head.prev = entry;
+    }
+    this.head = entry;
+    if (!this.tail) this.tail = entry;
+    this.size += entry.size;
+    if (entry.timeout) clearTimeout(entry.timeout);
+    if (this.options.maxAge)
+      entry.timeout = setTimeout(
+        this.expireEntry.bind(this),
+        this.options.maxAge,
+        entry,
+      );
+    this.prune();
+    return entry;
+  }
+}
+
+export class Entry<T extends object> {
+  next: Entry<T> | null;
+  prev: Entry<T> | null;
+  timeout: number | NodeJS.Timeout | null = null;
+  constructor(
+    public value: T | WeakRef<T>,
+    public key: string,
+    public size: number,
+  ) {}
+  setNext(value: Entry<T> | null) {
+    this.next = value;
+    return this;
+  }
+  setPrev(value: Entry<T> | null) {
+    this.prev = value;
+    return this;
+  }
+  remove() {
+    if (this.timeout) clearTimeout(this.timeout);
+    this.prev?.setNext(this.next);
+    this.next?.setPrev(this.prev);
+    return this.disconnect();
+  }
+  clearTimeout() {
+    clearTimeout(this.timeout);
+  }
+  disconnect() {
+    this.prev = null;
+    this.next = null;
+    return this;
+  }
+  get disconnected() {
+    return !this.prev && !this.next;
+  }
+}
