@@ -26,8 +26,7 @@ export class Expirer<T extends object> {
 
   expireEntry(entry: Entry<T>) {
     this.registry.register(entry.value, entry.key);
-    if (!(entry.value instanceof WeakRef))
-      entry.value = new WeakRef(entry.value);
+    entry.weaken();
     this.remove(entry);
     return this;
   }
@@ -37,15 +36,11 @@ export class Expirer<T extends object> {
   }
   add(entry: Entry<T>) {
     this.registry.register(entry.value, `entry: ${entry.key}`);
-    if (entry.value instanceof WeakRef) entry.value = entry.value.deref();
-    if (this.head) {
-      entry.next = this.head;
-      this.head.prev = entry;
-    }
+    entry.strengthen().setNext(this.head?.setPrev(entry));
     this.head = entry;
     if (!this.tail) this.tail = entry;
     this.size += entry.size;
-    if (entry.timeout) clearTimeout(entry.timeout);
+    entry.clearTimeout();
     if (this.options.maxAge)
       entry.timeout = setTimeout(
         this.expireEntry.bind(this),
@@ -90,5 +85,13 @@ export class Entry<T extends object> {
   }
   get disconnected() {
     return !this.prev && !this.next;
+  }
+  weaken() {
+    if (!(this.value instanceof WeakRef)) this.value = new WeakRef(this.value);
+    return this;
+  }
+  strengthen() {
+    if (this.value instanceof WeakRef) this.value = this.value.deref();
+    return this;
   }
 }
