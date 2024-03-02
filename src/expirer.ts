@@ -16,8 +16,7 @@ export class Expirer<T extends object> {
   ) {}
   add(entry: Entry<T>) {
     this.registry.register(entry.value, `entry: ${entry.key}`);
-    entry.strengthen().setNext(this.head?.setPrev(entry));
-    this.head = entry;
+    this.head = entry.strengthen().setNext(this.head?.setPrev(entry));
     if (!this.tail) this.tail = entry;
     this.size += entry.size;
     entry.clearTimeout();
@@ -88,11 +87,21 @@ export class Entry<T extends object> {
     return !this.prev && !this.next;
   }
   weaken() {
-    if (!(this.value instanceof WeakRef)) this.value = new WeakRef(this.value);
+    if (!isWeak(this.value)) this.value = new WeakRef(this.value);
     return this;
   }
   strengthen() {
-    if (this.value instanceof WeakRef) this.value = this.value.deref();
+    if (isWeak(this.value)) this.value = this.value.deref();
     return this;
   }
+  peek() {
+    return isWeak(this.value) ? this.value.deref() : this.value;
+  }
+  get finalized() {
+    return !this.value || (isWeak(this.value) && !this.value.deref());
+  }
 }
+
+export const isWeak = <T extends object>(
+  value: T | WeakRef<T>,
+): value is WeakRef<T> => value instanceof WeakRef;
