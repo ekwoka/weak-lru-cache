@@ -24,19 +24,19 @@ const content = JSON.stringify(
     gzipped,
   },
   null,
-  2
+  2,
 );
 const old = JSON.parse(await readFile(join('size.json'), 'utf8'));
 await writeFile(join('size.json'), content, 'utf8');
 console.log(
   `Package size: ${old.minified.pretty} => ${minified.pretty}: ${prettyBytes(
-    minified.raw - old.minified.raw
-  )}`
+    minified.raw - old.minified.raw,
+  )}`,
 );
 console.log(
   `Minzipped size: ${old.gzipped.pretty} => ${gzipped.pretty}: ${prettyBytes(
-    gzipped.raw - old.gzipped.raw
-  )}`
+    gzipped.raw - old.gzipped.raw,
+  )}`,
 );
 
 function sizeInfo(bytesSize) {

@@ -66,7 +66,7 @@ export class WeakLRUCache<T extends object> implements Map<string, T> {
   }
 }
 
-export enum IteratorMode {
+enum IteratorMode {
   ENTRIES = 0,
   KEYS = 1,
   VALUES = 2,
