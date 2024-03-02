@@ -13,7 +13,7 @@ export class WeakLRUCache<T extends object> implements Map<string, T> {
     entry.value = value;
     entry.size = this.options.getSize?.(value) ?? 1;
     this.cache.set(key, entry);
-    this.expirer.add(this.expirer.remove(entry)).value as T;
+    this.expirer.reset(entry).value as T;
     return this;
   }
   get(key: string): T {
@@ -22,7 +22,7 @@ export class WeakLRUCache<T extends object> implements Map<string, T> {
     if (entry.value instanceof WeakRef) entry.value = entry.value.deref();
     if (!entry.value)
       return this.cache.delete(this.expirer.remove(entry).key), undefined;
-    return this.expirer.add(this.expirer.remove(entry)).value as T;
+    return this.expirer.reset(entry).value as T;
   }
   peek(key: string): T {
     const entry = this.cache.get(key);

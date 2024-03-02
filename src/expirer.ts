@@ -4,36 +4,16 @@ export class Expirer<T extends object> {
   size = 0;
   head: Entry<T> | null = null;
   tail: Entry<T> | null = null;
-  registry: FinalizationRegistry<string>;
+  registry: FinalizationRegistry<string> = new FinalizationRegistry(
+    (key: string) =>
+      this.cache.has(key) &&
+      this.cache.delete(this.remove(this.cache.get(key)).key),
+  );
 
   constructor(
     public cache: Map<string, Entry<T>>,
     public options: LRUCacheOptions<T>,
-  ) {
-    this.registry = new FinalizationRegistry(
-      (key: string) =>
-        cache.has(key) && cache.delete(this.remove(cache.get(key)).key),
-    );
-  }
-  remove(entry: Entry<T>) {
-    entry.clearTimeout();
-    if (entry.disconnected) return entry;
-    if (this.tail === entry) this.tail = entry.next ?? entry.prev;
-    if (this.head === entry) this.head = entry.next;
-    this.size -= entry.size;
-    return entry.remove();
-  }
-
-  expireEntry(entry: Entry<T>) {
-    this.registry.register(entry.value, entry.key);
-    entry.weaken();
-    this.remove(entry);
-    return this;
-  }
-  prune() {
-    if (this.size <= (this.options.size ?? 1000)) return;
-    this.expireEntry(this.tail);
-  }
+  ) {}
   add(entry: Entry<T>) {
     this.registry.register(entry.value, `entry: ${entry.key}`);
     entry.strengthen().setNext(this.head?.setPrev(entry));
@@ -50,6 +30,27 @@ export class Expirer<T extends object> {
     this.prune();
     return entry;
   }
+  remove(entry: Entry<T>) {
+    entry.clearTimeout();
+    if (entry.disconnected) return entry;
+    if (this.tail === entry) this.tail = entry.next ?? entry.prev;
+    if (this.head === entry) this.head = entry.next;
+    this.size -= entry.size;
+    return entry.remove();
+  }
+  reset(entry: Entry<T>) {
+    return this.add(this.remove(entry));
+  }
+  prune() {
+    if (this.size <= (this.options.size ?? 1000)) return;
+    this.expireEntry(this.tail);
+  }
+  expireEntry(entry: Entry<T>) {
+    this.registry.register(entry.value, entry.key);
+    entry.weaken();
+    this.remove(entry);
+    return this;
+  }
 }
 
 export class Entry<T extends object> {
@@ -61,12 +62,12 @@ export class Entry<T extends object> {
     public key: string,
     public size: number,
   ) {}
-  setNext(value: Entry<T> | null) {
-    this.next = value;
+  setNext(next: Entry<T> | null) {
+    this.next = next;
     return this;
   }
-  setPrev(value: Entry<T> | null) {
-    this.prev = value;
+  setPrev(prev: Entry<T> | null) {
+    this.prev = prev;
     return this;
   }
   remove() {
