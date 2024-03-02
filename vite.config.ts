@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { resolve } from 'node:path';
+
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 
@@ -8,9 +8,9 @@ export default defineConfig({
   build: {
     target: 'esnext',
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      entry: './src/index.ts',
       fileName: 'index',
-      formats: ['es', 'cjs'],
+      formats: ['es'],
     },
     minify: false,
   },

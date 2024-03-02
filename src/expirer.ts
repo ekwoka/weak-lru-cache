@@ -1,54 +1,107 @@
-import { Entry, LRUCacheOptions } from './types';
-export type Expirer<T extends object> = ReturnType<typeof Expirer<T>>;
-export const Expirer = <T extends object>(
-  cache: Map<string, Entry<T>>,
-  options: LRUCacheOptions<T>
-) => {
-  let size = 0;
-  let head: Entry<T> | null = null;
-  let tail: Entry<T> | null = null;
-  const remove = (entry: Entry<T>) => {
-    if (entry.timeout) clearTimeout(entry.timeout);
-    if (!entry.prev && !entry.next) return entry;
-    if (entry.prev) entry.prev.next = entry.next;
-    if (entry.next) entry.next.prev = entry.prev;
-    if (tail === entry) tail = entry.next ?? entry.prev;
-    if (head === entry) head = entry.next;
-    entry.prev = null;
-    entry.next = null;
-    size -= entry.size;
-    return entry;
-  };
-  const registry = new FinalizationRegistry(
-    (key: string) => cache.has(key) && cache.delete(remove(cache.get(key)).key)
+import type { LRUCacheOptions } from './types';
+
+export class Expirer<T extends object> {
+  size = 0;
+  head: Entry<T> | null = null;
+  tail: Entry<T> | null = null;
+  registry: FinalizationRegistry<string> = new FinalizationRegistry(
+    (key: string) =>
+      this.cache.has(key) &&
+      this.cache.delete(this.remove(this.cache.get(key)).key),
   );
-  const expireEntry = (entry: Entry<T>) => {
-    registry.register(entry.value, entry.key);
-    if (!(entry.value instanceof WeakRef))
-      entry.value = new WeakRef(entry.value);
-    remove(entry);
-  };
-  const prune = () => {
-    if (size <= (options.size ?? 1000)) return;
-    expireEntry(tail);
-  };
-  return {
-    add: (entry: Entry<T>) => {
-      registry.register(entry.value, `entry: ${entry.key}`);
-      if (entry.value instanceof WeakRef) entry.value = entry.value.deref();
-      if (head) {
-        entry.next = head;
-        head.prev = entry;
-      }
-      head = entry;
-      if (!tail) tail = entry;
-      size += entry.size;
-      if (entry.timeout) clearTimeout(entry.timeout);
-      if (options.maxAge)
-        entry.timeout = setTimeout(expireEntry, options.maxAge, entry);
-      prune();
-      return entry;
-    },
-    remove,
-  };
-};
+
+  constructor(
+    public cache: Map<string, Entry<T>>,
+    public options: LRUCacheOptions<T>,
+  ) {}
+  add(entry: Entry<T>) {
+    this.registry.register(entry.value, `entry: ${entry.key}`);
+    this.head = entry.strengthen().setNext(this.head?.setPrev(entry));
+    if (!this.tail) this.tail = entry;
+    this.size += entry.size;
+    entry.clearTimeout();
+    if (this.options.maxAge)
+      entry.timeout = setTimeout(
+        this.expireEntry.bind(this),
+        this.options.maxAge,
+        entry,
+      );
+    this.prune();
+    return entry;
+  }
+  remove(entry: Entry<T>) {
+    entry.clearTimeout();
+    if (entry.disconnected) return entry;
+    if (this.tail === entry) this.tail = entry.next ?? entry.prev;
+    if (this.head === entry) this.head = entry.next;
+    this.size -= entry.size;
+    return entry.remove();
+  }
+  reset(entry: Entry<T>) {
+    return this.add(this.remove(entry));
+  }
+  prune() {
+    if (this.size <= (this.options.size ?? 1000)) return;
+    this.expireEntry(this.tail);
+  }
+  expireEntry(entry: Entry<T>) {
+    this.registry.register(entry.value, entry.key);
+    entry.weaken();
+    this.remove(entry);
+    return this;
+  }
+}
+
+export class Entry<T extends object> {
+  next: Entry<T> | null;
+  prev: Entry<T> | null;
+  timeout: number | NodeJS.Timeout | null = null;
+  constructor(
+    public value: T | WeakRef<T>,
+    public key: string,
+    public size: number,
+  ) {}
+  setNext(next: Entry<T> | null) {
+    this.next = next;
+    return this;
+  }
+  setPrev(prev: Entry<T> | null) {
+    this.prev = prev;
+    return this;
+  }
+  remove() {
+    if (this.timeout) clearTimeout(this.timeout);
+    this.prev?.setNext(this.next);
+    this.next?.setPrev(this.prev);
+    return this.disconnect();
+  }
+  clearTimeout() {
+    clearTimeout(this.timeout);
+  }
+  disconnect() {
+    this.prev = null;
+    this.next = null;
+    return this;
+  }
+  get disconnected() {
+    return !this.prev && !this.next;
+  }
+  weaken() {
+    if (!isWeak(this.value)) this.value = new WeakRef(this.value);
+    return this;
+  }
+  strengthen() {
+    if (isWeak(this.value)) this.value = this.value.deref();
+    return this;
+  }
+  peek() {
+    return isWeak(this.value) ? this.value.deref() : this.value;
+  }
+  get finalized() {
+    return !this.value || (isWeak(this.value) && !this.value.deref());
+  }
+}
+
+export const isWeak = <T extends object>(
+  value: T | WeakRef<T>,
+): value is WeakRef<T> => value instanceof WeakRef;

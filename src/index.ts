@@ -1,114 +1,105 @@
-import { Expirer } from './expirer';
-import { Entry, LRUCacheOptions } from './types';
+import { Expirer, Entry } from './expirer';
+import type { LRUCacheOptions } from './types';
 
-export type WeakLRUCache<T extends object> = {
-  set: (key: string, value: T) => WeakLRUCache<T>;
-  get: (key: string) => T;
-  peek: (key: string) => T;
-  peekReference: (key: string) => T | WeakRef<T>;
-  has: (key: string) => boolean;
-  delete: (key: string) => boolean;
-  clear: () => void;
-  keys: () => IterableIterator<string>;
-  values: () => IterableIterator<T>;
-  entries: () => IterableIterator<[string, T]>;
-  [Symbol.iterator]: () => IterableIterator<[string, T]>;
-  size: number;
-  forEach: (
-    cb: (value: T, key: string, cache: WeakLRUCache<T>) => void
-  ) => void;
-};
+export class WeakLRUCache<T extends object> implements Map<string, T> {
+  [Symbol.toStringTag]: 'WeakLRUCache';
+  public cache: Map<string, Entry<T>> = new Map();
+  public expirer: Expirer<T>;
+  constructor(public options: LRUCacheOptions<T> = {}) {
+    this.expirer = new Expirer(this.cache, this.options);
+  }
+  set(key: string, value: T): this {
+    const entry = this.cache.get(key) ?? new Entry(value, key, 1);
+    entry.value = value;
+    entry.size = this.options.getSize?.(value) ?? 1;
+    this.cache.set(key, entry);
+    this.expirer.reset(entry);
+    return this;
+  }
+  get(key: string): T {
+    const entry = this.cache.get(key);
+    if (!entry) return undefined;
+    if (!entry.strengthen().value)
+      return this.cache.delete(this.expirer.remove(entry).key), undefined;
+    return this.expirer.reset(entry).value as T;
+  }
+  peek(key: string): T {
+    const entry = this.cache.get(key);
+    if (!entry) return undefined;
+    if (entry.finalized)
+      return this.cache.delete(this.expirer.remove(entry).key), undefined;
+    return entry.peek();
+  }
+  peekReference(key: string): T | WeakRef<T> {
+    return this.cache.get(key)?.value;
+  }
+  has(key: string): boolean {
+    return this.cache.has(key);
+  }
+  delete(key: string): boolean {
+    return this.cache.has(key)
+      ? this.cache.delete(this.expirer.remove(this.cache.get(key)).key)
+      : false;
+  }
+  clear(): void {
+    this.cache.forEach(this.expirer.remove);
+    this.cache.clear();
+  }
+  keys(): IterableIterator<string> {
+    return iterateCache(this.cache, this.expirer, IteratorMode.KEYS);
+  }
+  values(): IterableIterator<T> {
+    return iterateCache(this.cache, this.expirer, IteratorMode.VALUES);
+  }
+  entries(): IterableIterator<[string, T]> {
+    return iterateCache(this.cache, this.expirer);
+  }
+  [Symbol.iterator](): IterableIterator<[string, T]> {
+    return iterateCache(this.cache, this.expirer);
+  }
+  get size() {
+    return this.cache.size;
+  }
+  forEach(cb: (value: T, key: string, cache: this) => void) {
+    for (const [key, value] of iterateCache(this.cache, this.expirer))
+      cb(value, key, this);
+  }
+}
 
-export const WeakLRUCache = <T extends object>(
-  options: LRUCacheOptions<T> = {}
-): WeakLRUCache<T> => {
-  const cache = new Map<string, Entry<T>>();
-  const expirer = Expirer<T>(cache, options);
-  const weakLRUCache: WeakLRUCache<T> = {
-    set: (key: string, value: T): WeakLRUCache<T> => {
-      const entry = cache.get(key) ?? {
-        key,
-        value,
-        next: null,
-        prev: null,
-        size: 1,
-      };
-      entry.value = value;
-      entry.size = options.getSize?.(value) ?? 1;
-      cache.set(key, entry);
-      expirer.add(expirer.remove(entry)).value as T;
-      return weakLRUCache;
-    },
-    get: (key: string): T => {
-      const entry = cache.get(key);
-      if (!entry) return undefined;
-      if (entry.value instanceof WeakRef) entry.value = entry.value.deref();
-      if (!entry.value)
-        return cache.delete(expirer.remove(entry).key), undefined;
-      return expirer.add(expirer.remove(entry)).value as T;
-    },
-    peek: (key: string): T => {
-      const entry = cache.get(key);
-      if (!entry) return undefined;
-      if (
-        !entry.value ||
-        (entry.value instanceof WeakRef && !entry.value.deref())
-      )
-        return cache.delete(expirer.remove(entry).key), undefined;
-      if (entry.value instanceof WeakRef) return entry.value.deref();
-      return entry.value;
-    },
-    peekReference: (key: string): T | WeakRef<T> => cache.get(key)?.value,
-    has: (key: string): boolean => cache.has(key),
-    delete: (key: string): boolean =>
-      cache.has(key) ? cache.delete(expirer.remove(cache.get(key)).key) : false,
-    clear: (): void => (cache.forEach(expirer.remove), cache.clear()),
-    keys: (): IterableIterator<string> => iterateCache(cache, expirer, 0),
-    values: (): IterableIterator<T> => iterateCache(cache, expirer, 1),
-    entries: (): IterableIterator<[string, T]> => iterateCache(cache, expirer),
-    [Symbol.iterator]: (): IterableIterator<[string, T]> =>
-      iterateCache(cache, expirer),
-    get size() {
-      return cache.size;
-    },
-    forEach: (cb) => {
-      for (const [key, value] of iterateCache(cache, expirer))
-        cb(value, key, weakLRUCache);
-    },
-  };
-  return weakLRUCache;
-};
+enum IteratorMode {
+  ENTRIES = 0,
+  KEYS = 1,
+  VALUES = 2,
+}
 
 function iterateCache<T extends object>(
   cache: Map<string, Entry<T>>,
   expirer: Expirer<T>,
-  mode: 0
+  mode: IteratorMode.KEYS,
 ): IterableIterator<string>;
 function iterateCache<T extends object>(
   cache: Map<string, Entry<T>>,
   expirer: Expirer<T>,
-  mode: 1
+  mode: IteratorMode.VALUES,
 ): IterableIterator<T>;
 function iterateCache<T extends object>(
   cache: Map<string, Entry<T>>,
   expirer: Expirer<T>,
-  mode?: 2
+  mode?: IteratorMode.ENTRIES,
 ): IterableIterator<[string, T]>;
 function* iterateCache<T extends object>(
   cache: Map<string, Entry<T>>,
   expirer: Expirer<T>,
-  mode: 0 | 1 | 2 = 2
+  mode: IteratorMode = IteratorMode.ENTRIES,
 ): IterableIterator<[string, T] | string | T> {
   for (const [key, entry] of cache.entries()) {
-    const value =
-      entry.value instanceof WeakRef ? entry.value.deref() : entry.value;
-    if (!value) {
+    if (entry.finalized) {
       cache.delete(expirer.remove(entry).key);
       continue;
     }
-    if (mode === 0) yield key;
-    else if (mode === 1) yield value;
-    else yield [key, value];
+    if (mode === IteratorMode.KEYS) yield key;
+    else if (mode === IteratorMode.VALUES) yield entry.peek();
+    else yield [key, entry.peek()];
   }
 }
 
